@@ -41,7 +41,7 @@ raw_curves = list()
 
 raw_plot = raw_plotwidget.addPlot()
 raw_plot.setClipToView(True)
-raw_plot.setRange(yRange=[0, 65535])
+raw_plot.setRange(yRange=[0, 3.3])
 data = np.random.normal(size=20)
 for j in range(4):
     raw_curves.append(raw_plot.plot(data, pen=pg.mkPen(
