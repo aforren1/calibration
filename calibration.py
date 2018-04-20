@@ -28,12 +28,14 @@ win.setWindowTitle('Calibration')
 
 d0 = Dock('Voltages', size=(1000, 600))
 d1 = Dock('Forces', size=(1000, 600))
+d3 = Dock('Hysteresis', size=(1000, 600))
 d2 = Dock('Settings', size=(250, 600))
 area.addDock(d0, 'left')
 area.addDock(d1, 'left')
 area.addDock(d2, 'right')
 
 area.moveDock(d0, 'above', d1)
+area.moveDock(d3, 'below', d1)
 
 # "raw" voltages
 raw_plotwidget = pg.GraphicsLayoutWidget()
@@ -58,18 +60,39 @@ force_plot.setClipToView(True)
 force_plot.setRange(yRange=[-1.5, 1.5])
 for j in range(3):
     force_curves.append(force_plot.plot(data, pen=pg.mkPen(
-                        color=pg.intColor(j, hues=5, alpha=255, width=3))))
+                        color=pg.intColor(j, hues=5, alpha=255, width=3)
+                        )))
 
 d1.addWidget(force_plotwidget)
 
+# hysteresis (forces + zeroing?)
+hyst_plotwidget = pg.GraphicsLayoutWidget()
+hyst_curves = list()
+
+hyst_plot = hyst_plotwidget.addPlot()
+hyst_plot.setClipToView(True)
+hyst_plot.setRange(yRange=[-1.5, 1.5])
+for j in range(3):
+    hyst_curves.append(hyst_plot.plot(data, pen=pg.mkPen(
+        color=pg.intColor(j, hues=5, alpha=255, width=3)
+    )))
+
+d3.addWidget(hyst_plotwidget)
+
+reference_vals = np.zeros((15))
+
+def update_reference():
+    global reference_vals, current_force_data_view
+    reference_vals = np.median(current_force_data_view, axis=1)
 
 logging = False
 log_file_name = ''
 
+
 def stop_logging():
     # write data to file, clean up
     global logging, log_file_name, log_settings
-    global logged_force_data, logged_raw_data
+    global logged_force_data, logged_raw_data, reference_vals
     logging = False
     logging_toggler.setText('Log for N seconds')
 
@@ -82,6 +105,7 @@ def stop_logging():
         group.attrs['angle1'] = log_settings['angle1']
         group.attrs['angle2'] = log_settings['angle2']
         group.attrs['weight'] = log_settings['weight']
+        group.attrs['hysteresis_reference'] = reference_vals
         group.create_dataset('voltages', data=logged_raw_data)
         group.create_dataset('forces', data=logged_force_data)
     # reset things
@@ -92,6 +116,8 @@ def stop_logging():
 
 timer = QtCore.QTimer()
 log_duration = 2
+
+
 def log_and_print():
     global logging, log_file_name, log_duration, log_settings
     # ignore if we're already logging
@@ -133,7 +159,7 @@ setwidget.addWidget(filename_info2, row=0, col=2)
 # finger selection (sets an offset)
 finger_select = QtGui.QComboBox()
 finger_select.addItems(['thumb', 'index', 'middle', 'ring', 'pinky'])
-finger_select.setCurrentIndex(0) # defines the offset
+finger_select.setCurrentIndex(0)  # defines the offset
 setwidget.addWidget(finger_select, row=5, col=3)
 finger_info = QtGui.QLabel()
 finger_info.setText('Finger:')
@@ -163,6 +189,11 @@ logging_toggler = QtGui.QPushButton('Log for N seconds')
 logging_toggler.clicked.connect(log_and_print)
 setwidget.addWidget(logging_toggler, row=1, col=0)
 
+# Update reference used for hysteresis calc
+hyst_toggler = QtGui.QPushButton('Update hysteresis reference')
+hyst_toggler.clicked.connect(update_reference)
+setwidget.addWidget(hyst_toggler, row=1, col=1)
+
 # set the log duration
 record_for_info = QtGui.QLabel()
 record_for_info.setText('Duration of log (s):')
@@ -181,10 +212,12 @@ log_settings = {'finger': None,
                 'angle2': None,
                 'weight': None}
 
+
 def update():
     global current_raw_data_view, current_force_data_view
     global logged_raw_data, logged_force_data, logging, log_file_name, log_settings
     global log_duration
+    global reference_vals
     ts, data = dev.read()
     if ts is None:
         return
@@ -195,15 +228,18 @@ def update():
         current_raw_data_view = np.vstack((current_raw_data_view, data[1]))
         current_force_data_view = np.vstack((current_force_data_view, data[0]))
     else:
-        current_raw_data_view = np.roll(current_raw_data_view, -data[1].shape[0], axis=0)
+        current_raw_data_view = np.roll(
+            current_raw_data_view, -data[1].shape[0], axis=0)
         current_raw_data_view[-data[1].shape[0]:, :] = data[1]
-        current_force_data_view = np.roll(current_force_data_view, -data[0].shape[0], axis=0)
+        current_force_data_view = np.roll(
+            current_force_data_view, -data[0].shape[0], axis=0)
         current_force_data_view[-data[0].shape[0]:, :] = data[0]
     current_index = finger_select.currentIndex()
-    if logging: # update for hdf5
+    if logging:  # update for hdf5
         if logged_raw_data is None:
             log_settings['finger'] = current_index
-            log_settings['datetime'] = datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S')
+            log_settings['datetime'] = datetime.datetime.now().strftime(
+                '%Y-%m-%d_%H%M%S')
             log_settings['duration'] = log_duration
             log_settings['angle1'] = float(record_angle1.text())
             log_settings['angle2'] = float(record_angle2.text())
@@ -211,22 +247,28 @@ def update():
             logged_raw_data = data[1][:, 4*current_index:4*current_index+4]
             logged_force_data = data[0][:, 3*current_index:3*current_index+3]
         else:
-            logged_raw_data = np.vstack((logged_raw_data, data[1][:, 4*current_index:4*current_index+4]))
-            logged_force_data = np.vstack((logged_force_data, data[0][:, 3*current_index:3*current_index+3]))
+            logged_raw_data = np.vstack(
+                (logged_raw_data, data[1][:, 4*current_index:4*current_index+4]))
+            logged_force_data = np.vstack(
+                (logged_force_data, data[0][:, 3*current_index:3*current_index+3]))
     for counter, c in enumerate(raw_curves):
-        c.setData(y=current_raw_data_view[:, 4*current_index + counter]/65535.0 * 3.3)
+        c.setData(
+            y=current_raw_data_view[:, 4*current_index + counter]/65535.0 * 3.3)
     for counter, c in enumerate(force_curves):
         c.setData(y=current_force_data_view[:, 3*current_index + counter])
+    for counter, c in enumerate(hyst_curves):
+        c.setData(y=current_force_data_view[:, 3*current_index + counter] - reference_vals[3*current_index + counter])
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--demo', help='Demo mode or not', dest='demo', action='store_true')
+    parser.add_argument('--demo', help='Demo mode or not',
+                        dest='demo', action='store_true')
     parser.set_defaults(demo=False)
     args = parser.parse_args()
     if args.demo:
         device = MpI(FakeInput, sampling_frequency=1000,
-                     data_shape=[[15], [20]], 
+                     data_shape=[[15], [20]],
                      data_type=[ctypes.c_double, ctypes.c_double])
     else:
         device = MpI(Hand)
