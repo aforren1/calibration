@@ -214,7 +214,7 @@ def update():
             logged_raw_data = np.vstack((logged_raw_data, data[1][:, 4*current_index:4*current_index+4]))
             logged_force_data = np.vstack((logged_force_data, data[0][:, 3*current_index:3*current_index+3]))
     for counter, c in enumerate(raw_curves):
-        c.setData(y=current_raw_data_view[:, 4*current_index + counter])
+        c.setData(y=current_raw_data_view[:, 4*current_index + counter]/65535.0 * 3.3)
     for counter, c in enumerate(force_curves):
         c.setData(y=current_force_data_view[:, 3*current_index + counter])
 
