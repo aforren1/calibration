@@ -92,7 +92,7 @@ log_file_name = ''
 def stop_logging():
     # write data to file, clean up
     global logging, log_file_name, log_settings
-    global logged_force_data, logged_raw_data, reference_vals
+    global logged_force_data, logged_raw_data
     logging = False
     logging_toggler.setText('Log for N seconds')
 
@@ -105,7 +105,7 @@ def stop_logging():
         group.attrs['angle1'] = log_settings['angle1']
         group.attrs['angle2'] = log_settings['angle2']
         group.attrs['weight'] = log_settings['weight']
-        group.attrs['hysteresis_reference'] = reference_vals
+        group.attrs['hysteresis_reference'] = log_settings['reference_vals']
         group.create_dataset('voltages', data=logged_raw_data)
         group.create_dataset('forces', data=logged_force_data)
     # reset things
@@ -210,8 +210,8 @@ log_settings = {'finger': None,
                 'duration': None,
                 'angle1': None,
                 'angle2': None,
-                'weight': None}
-
+                'weight': None,
+                'reference_vals': None}
 
 def update():
     global current_raw_data_view, current_force_data_view
@@ -244,6 +244,7 @@ def update():
             log_settings['angle1'] = float(record_angle1.text())
             log_settings['angle2'] = float(record_angle2.text())
             log_settings['weight'] = float(record_weight.text())
+            log_settings['reference_vals'] = reference_vals[3*current_index:3*current_index+3]
             logged_raw_data = data[1][:, 4*current_index:4*current_index+4]
             logged_force_data = data[0][:, 3*current_index:3*current_index+3]
         else:
