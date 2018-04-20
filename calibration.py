@@ -93,14 +93,26 @@ def stop_logging():
 timer = QtCore.QTimer()
 log_duration = 2
 def log_and_print():
-    global logging, log_file_name, log_duration
+    global logging, log_file_name, log_duration, log_settings
+    # ignore if we're already logging
+    if logging:
+        print('already logging.')
+        return
+    # validate fields
+    try:
+        dur = record_dur.text()
+        if dur == '':
+            dur = '2'
+        float(dur)
+        float(record_angle1.text())
+        float(record_angle2.text())
+        float(record_weight.text())
+    except:
+        print('Something is wrong with one of the fields...')
+        return
     logging = True
     log_file_name = filename_edit.text() + '.hdf5'
-    dur = record_dur.text()
-    if dur == '':
-        log_duration = 2
-    else:
-        log_duration = float(dur)
+    log_duration = float(dur)
     logging_toggler.setText('Now logging for %s seconds' % dur)
     timer.singleShot(int(log_duration * 1000), stop_logging)
 
