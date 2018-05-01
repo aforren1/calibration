@@ -108,6 +108,9 @@ def stop_logging():
         group.attrs['hysteresis_reference'] = log_settings['reference_vals']
         group.create_dataset('voltages', data=logged_raw_data)
         group.create_dataset('forces', data=logged_force_data)
+    print('Finished trial. Settings: ')
+    for i in log_settings:
+        print(i + ', value: ' + str(log_settings[i]))
     # reset things
     log_settings = dict.fromkeys(log_settings, None)
     logged_force_data = None
