@@ -29,13 +29,16 @@ win.setWindowTitle('Calibration')
 d0 = Dock('Voltages', size=(1000, 600))
 d1 = Dock('Forces', size=(1000, 600))
 d3 = Dock('Hysteresis', size=(1000, 600))
+d4 = Dock('Calibration', size=(1000, 600))
 d2 = Dock('Settings', size=(250, 600))
 area.addDock(d0, 'left')
 area.addDock(d1, 'left')
+area.addDock(d4, 'left')
 area.addDock(d2, 'right')
 
 area.moveDock(d0, 'above', d1)
 area.moveDock(d3, 'below', d1)
+area.moveDock(d4, 'below', d3)
 
 # "raw" voltages
 raw_plotwidget = pg.GraphicsLayoutWidget()
@@ -78,6 +81,20 @@ for j in range(3):
     )))
 
 d3.addWidget(hyst_plotwidget)
+
+# + calibration
+calib_plotwidget = pg.GraphicsLayoutWidget()
+calib_curves = list()
+
+calib_plot = calib_plotwidget.addPlot()
+calib_plot.setClipToView(True)
+calib_plot.setRange(yRange=[-1.5, 1.5])
+for j in range(3):
+    calib_curves.append(calib_plot.plot(data, pen=pg.mkPen(
+                        color=pg.intColor(j, hues=5, alpha=255, width=3)
+                        )))
+
+d4.addWidget(calib_plotwidget)
 
 reference_vals = np.zeros((15))
 
@@ -206,6 +223,7 @@ setwidget.addWidget(record_dur, row=2, col=1)
 
 current_raw_data_view = None
 current_force_data_view = None
+current_calib_data_view = None
 logged_raw_data = None
 logged_force_data = None
 log_settings = {'finger': None,
@@ -217,7 +235,7 @@ log_settings = {'finger': None,
                 'reference_vals': None}
 
 def update():
-    global current_raw_data_view, current_force_data_view
+    global current_raw_data_view, current_force_data_view, current_calib_data_view
     global logged_raw_data, logged_force_data, logging, log_file_name, log_settings
     global log_duration
     global reference_vals
@@ -227,9 +245,11 @@ def update():
     if current_raw_data_view is None:
         current_raw_data_view = data[1]
         current_force_data_view = data[0]
+        current_calib_data_view = data[2]
     elif current_raw_data_view.shape[0] < 1000:
         current_raw_data_view = np.vstack((current_raw_data_view, data[1]))
         current_force_data_view = np.vstack((current_force_data_view, data[0]))
+        current_calib_data_view = np.vstack((current_calib_data_view, data[2]))
     else:
         current_raw_data_view = np.roll(
             current_raw_data_view, -data[1].shape[0], axis=0)
@@ -237,6 +257,9 @@ def update():
         current_force_data_view = np.roll(
             current_force_data_view, -data[0].shape[0], axis=0)
         current_force_data_view[-data[0].shape[0]:, :] = data[0]
+        current_calib_data_view = np.roll(
+            current_calib_data_view, -data[0].shape[0], axis=0)
+        current_calib_data_view[-data[0].shape[0]:, :] = data[2]
     current_index = finger_select.currentIndex()
     if logging:  # update for hdf5
         if logged_raw_data is None:
@@ -262,6 +285,8 @@ def update():
         c.setData(y=current_force_data_view[:, 3*current_index + counter])
     for counter, c in enumerate(hyst_curves):
         c.setData(y=current_force_data_view[:, 3*current_index + counter] - reference_vals[3*current_index + counter])
+    for counter, c in enumerate(calib_curves):
+        c.setData(y=current_calib_data_view[:, 3*current_index + counter])
 
 
 if __name__ == '__main__':
@@ -272,8 +297,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.demo:
         device = MpI(FakeInput, sampling_frequency=1000,
-                     data_shape=[[15], [20]],
-                     data_type=[ctypes.c_double, ctypes.c_double])
+                     data_shape=[[15], [20], [15]],
+                     data_type=[ctypes.c_double, ctypes.c_double, ctypes.c_double])
     else:
         device = MpI(Hand)
 
