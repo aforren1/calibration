@@ -1,0 +1,7 @@
+pyqtgraph==0.10.0
+toon==0.9.2
+h5py
+numpy
+matplotlib
+PyQt5
+hidapi
